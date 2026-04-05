@@ -83,14 +83,14 @@ body:
         Describe exactly what is being added. Be specific about commands, output, behavior, and user interaction.
         Include example commands or example output where possible.
       placeholder: |
-        A new command `/gsd:rollback` that:
+        A new command `/gsd-rollback` that:
         1. Reads the current phase from STATE.md
         2. Reverts STATE.md to the previous phase's snapshot
         3. Outputs a confirmation with the rolled-back state
 
         Example usage:
         ```
-        /gsd:rollback
+        /gsd-rollback
         > Rolled back from Phase 3 (failed) to Phase 2 (completed)
         ```
     validations:
@@ -139,9 +139,9 @@ body:
         List the specific, testable conditions that must be true for this feature to be considered complete.
         These become the basis for reviewer sign-off. Vague criteria ("it works") are not acceptable.
       placeholder: |
-        - [ ] `/gsd:rollback` reverts STATE.md to the previous phase when current phase status is `failed`
-        - [ ] `/gsd:rollback` exits with an error if there is no previous phase to roll back to
-        - [ ] `/gsd:rollback` outputs the before/after phase names in its confirmation message
+        - [ ] `/gsd-rollback` reverts STATE.md to the previous phase when current phase status is `failed`
+        - [ ] `/gsd-rollback` exits with an error if there is no previous phase to roll back to
+        - [ ] `/gsd-rollback` outputs the before/after phase names in its confirmation message
         - [ ] Rollback is logged in the phase history so the AI agent can see it happened
         - [ ] All existing tests still pass
         - [ ] New tests cover the happy path, no-previous-phase case, and STATE.md corruption case
@@ -226,7 +226,7 @@ body:
       placeholder: |
         1. Manual STATE.md editing — rejected because it requires the developer to understand the schema
            and is error-prone. The AI agent cannot reliably guide this.
-        2. A `/gsd:reset` command that wipes all state — rejected because it is too destructive and
+        2. A `/gsd-reset` command that wipes all state — rejected because it is too destructive and
            loses all completed phase history.
     validations:
       required: true

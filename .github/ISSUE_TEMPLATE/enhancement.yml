@@ -39,7 +39,7 @@ body:
     attributes:
       label: What existing feature or behavior does this improve?
       description: Name the specific command, workflow, output, or behavior you are enhancing.
-      placeholder: "e.g., `/gsd:plan` output, phase status display in statusline, context summary format"
+      placeholder: "e.g., `/gsd-plan` output, phase status display in statusline, context summary format"
     validations:
       required: true
 
@@ -50,7 +50,7 @@ body:
       description: |
         Describe exactly how the thing works today. Be specific. Include example output or commands if helpful.
       placeholder: |
-        Currently, `/gsd:status` shows:
+        Currently, `/gsd-status` shows:
         ```
         Phase 2/5 — In Progress
         ```
@@ -66,7 +66,7 @@ body:
       description: |
         Describe exactly how it should work after the enhancement. Be specific. Include example output or commands.
       placeholder: |
-        After the enhancement, `/gsd:status` would show:
+        After the enhancement, `/gsd-status` would show:
         ```
         Phase 2/5 — In Progress — "Implement core auth module"
         ```

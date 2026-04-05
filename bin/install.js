@@ -2990,7 +2990,7 @@ function convertClaudeToOpencodeFrontmatter(content, { isAgent = false } = {}) {
   convertedContent = convertedContent.replace(/\bAskUserQuestion\b/g, 'question');
   convertedContent = convertedContent.replace(/\bSlashCommand\b/g, 'skill');
   convertedContent = convertedContent.replace(/\bTodoWrite\b/g, 'todowrite');
-  // Replace /gsd:command with /gsd-command for opencode (flat command structure)
+  // Replace /gsd-command colon variant with /gsd-command for opencode (flat command structure)
   convertedContent = convertedContent.replace(/\/gsd:/g, '/gsd-');
   // Replace ~/.claude and $HOME/.claude with OpenCode's config location
   convertedContent = convertedContent.replace(/~\/\.claude\b/g, '~/.config/opencode');
@@ -3141,7 +3141,7 @@ function convertClaudeToKiloFrontmatter(content, { isAgent = false } = {}) {
   convertedContent = convertedContent.replace(/\bAskUserQuestion\b/g, 'question');
   convertedContent = convertedContent.replace(/\bSlashCommand\b/g, 'skill');
   convertedContent = convertedContent.replace(/\bTodoWrite\b/g, 'todowrite');
-  // Replace /gsd:command with /gsd-command for Kilo (flat command structure)
+  // Replace /gsd-command colon variant with /gsd-command for Kilo (flat command structure)
   convertedContent = convertedContent.replace(/\/gsd:/g, '/gsd-');
   // Replace ~/.claude and $HOME/.claude with Kilo's config location
   convertedContent = convertedContent.replace(/~\/\.claude\b/g, '~/.config/kilo');
@@ -5824,7 +5824,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   if (runtime === 'augment') program = 'Augment';
   if (runtime === 'trae') program = 'Trae';
 
-  let command = '/gsd:new-project';
+  let command = '/gsd-new-project';
   if (runtime === 'opencode') command = '/gsd-new-project';
   if (runtime === 'kilo') command = '/gsd-new-project';
   if (runtime === 'codex') command = '$gsd-new-project';
