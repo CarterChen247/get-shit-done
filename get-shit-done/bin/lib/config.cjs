@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error, planningRoot, withPlanningLock, CONFIG_DEFAULTS, atomicWriteFileSync } = require('./core.cjs');
+const { output, error, planningDir, withPlanningLock, CONFIG_DEFAULTS, atomicWriteFileSync } = require('./core.cjs');
 const {
   VALID_PROFILES,
   getAgentToModelMapForProfile,
@@ -200,7 +200,7 @@ function buildNewProjectConfig(userChoices) {
  * Idempotent: if config.json already exists, returns { created: false }.
  */
 function cmdConfigNewProject(cwd, choicesJson, raw) {
-  const planningBase = planningRoot(cwd);
+  const planningBase = planningDir(cwd);
   const configPath = path.join(planningBase, 'config.json');
 
   // Idempotent: don't overwrite existing config
@@ -245,7 +245,7 @@ function cmdConfigNewProject(cwd, choicesJson, raw) {
  * the happy path. But note that `error()` will still `exit(1)` out of the process.
  */
 function ensureConfigFile(cwd) {
-  const planningBase = planningRoot(cwd);
+  const planningBase = planningDir(cwd);
   const configPath = path.join(planningBase, 'config.json');
 
   // Ensure .planning directory exists
@@ -295,7 +295,7 @@ function cmdConfigEnsureSection(cwd, raw) {
  * the happy path. But note that `error()` will still `exit(1)` out of the process.
  */
 function setConfigValue(cwd, keyPath, parsedValue) {
-  const configPath = path.join(planningRoot(cwd), 'config.json');
+  const configPath = path.join(planningDir(cwd), 'config.json');
 
   return withPlanningLock(cwd, () => {
     // Load existing config or start with empty object
@@ -368,7 +368,7 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
 }
 
 function cmdConfigGet(cwd, keyPath, raw, defaultValue) {
-  const configPath = path.join(planningRoot(cwd), 'config.json');
+  const configPath = path.join(planningDir(cwd), 'config.json');
   const hasDefault = defaultValue !== undefined;
 
   if (!keyPath) {
