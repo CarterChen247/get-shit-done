@@ -9,11 +9,11 @@
 
 - [ ] **TOOL-01**: `gxd-tools.cjs` is a single flat file (~600 lines) with zero external npm dependencies
 - [ ] **TOOL-02**: Script makes zero outbound network calls
-- [ ] **TOOL-03**: Script never writes outside `.planning/` or `.claude/` directories
-- [ ] **TOOL-04**: Script never modifies `CLAUDE.md`, `settings.json`, or creates git hooks or symlinks
+- [x] **TOOL-03**: Script never writes outside `.planning/` or `.claude/` directories
+- [x] **TOOL-04**: Script never modifies `CLAUDE.md`, `settings.json`, or creates git hooks or symlinks
 - [ ] **TOOL-05**: Script handles missing `.planning/` gracefully with actionable error messages
 - [ ] **TOOL-06**: `init` commands emit `@file:` redirect when output exceeds ~50KB
-- [ ] **TOOL-07**: Script supports 18 core commands: init, roadmap, state, phase, config, progress, agent-skills
+- [x] **TOOL-07**: Script supports 18 core commands: init, roadmap, state, phase, config, progress, agent-skills
 
 ### Progress Skill
 
@@ -94,11 +94,11 @@
 |-------------|-------|--------|
 | TOOL-01 | Phase 1 | Pending |
 | TOOL-02 | Phase 1 | Pending |
-| TOOL-03 | Phase 1 | Pending |
-| TOOL-04 | Phase 1 | Pending |
+| TOOL-03 | Phase 1 | Complete |
+| TOOL-04 | Phase 1 | Complete |
 | TOOL-05 | Phase 1 | Pending |
 | TOOL-06 | Phase 1 | Pending |
-| TOOL-07 | Phase 1 | Pending |
+| TOOL-07 | Phase 1 | Complete |
 | PROG-01 | Phase 1 | Pending |
 | PROG-02 | Phase 1 | Pending |
 | PROG-03 | Phase 1 | Pending |
