@@ -51,7 +51,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Build SKILL.md with cherry-pick logic and static validation tests
+- [x] 02-01-PLAN.md — Build SKILL.md with cherry-pick logic and static validation tests
 - [ ] 02-02-PLAN.md — Integration test with git fixture repo and human verification
 
 ### Phase 3: Plan-Phase Pipeline
