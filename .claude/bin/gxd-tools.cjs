@@ -1306,6 +1306,181 @@ function cmdInitExecutePhase(cwd, phaseNum, raw) {
   output(result, raw);
 }
 
+// ─── Execute command implementations ─────────────────────────────────────────
+
+/**
+ * Command 17: phase-plan-index <N>
+ * List all PLAN.md files in a phase directory with frontmatter metadata and summary status.
+ */
+function cmdPhasePlanIndex(cwd, phaseNum, raw) {
+  if (!phaseNum) error('Usage: phase-plan-index <phase-number>');
+  requirePlanning(cwd);
+
+  const phaseDir = findPhaseDir(cwd, phaseNum);
+  if (!phaseDir) error('Phase directory not found for phase ' + phaseNum);
+
+  const relativeDir = toPosixPath(path.relative(cwd, phaseDir));
+
+  let allFiles;
+  try {
+    allFiles = fs.readdirSync(phaseDir);
+  } catch {
+    error('Cannot read phase directory: ' + phaseDir);
+  }
+
+  const planFiles = allFiles
+    .filter(f => f.endsWith('-PLAN.md'))
+    .sort((a, b) => {
+      // Numeric sort on plan number: e.g. "01-03-PLAN.md" -> 3
+      const numA = parseInt((a.match(/^(?:\d+-)?(\d+)-PLAN\.md$/) || [])[1] || '0', 10);
+      const numB = parseInt((b.match(/^(?:\d+-)?(\d+)-PLAN\.md$/) || [])[1] || '0', 10);
+      return numA - numB;
+    });
+
+  const plans = planFiles.map(f => {
+    const fullPath = path.join(phaseDir, f);
+    let content = '';
+    try {
+      content = fs.readFileSync(fullPath, 'utf-8');
+    } catch { /* skip unreadable */ }
+
+    const fm = extractFrontmatter(content);
+
+    // Extract plan number from filename: e.g. "01-03-PLAN.md" -> "03" -> 3
+    const planNumMatch = f.match(/^(?:\d+-)?(\d+)-PLAN\.md$/);
+    const planNumber = planNumMatch ? parseInt(planNumMatch[1], 10) : null;
+
+    // Check for matching SUMMARY.md
+    const summaryFile = f.replace('-PLAN.md', '-SUMMARY.md');
+    const hasSummary = fs.existsSync(path.join(phaseDir, summaryFile));
+    const status = hasSummary ? 'complete' : 'pending';
+
+    return {
+      file: f,
+      plan_number: planNumber,
+      wave: fm.wave !== undefined ? Number(fm.wave) : null,
+      depends_on: Array.isArray(fm.depends_on) ? fm.depends_on : (fm.depends_on ? [fm.depends_on] : []),
+      autonomous: fm.autonomous === 'true' || fm.autonomous === true,
+      type: fm.type || null,
+      status,
+      has_summary: hasSummary,
+    };
+  });
+
+  const completeCount = plans.filter(p => p.status === 'complete').length;
+  const pendingCount = plans.filter(p => p.status === 'pending').length;
+
+  output({
+    phase: phaseNum,
+    directory: relativeDir,
+    plans,
+    plan_count: plans.length,
+    complete_count: completeCount,
+    pending_count: pendingCount,
+  }, raw);
+}
+
+/**
+ * Command 18: phase complete <N>
+ * Mark a phase complete: verify all plans have summaries, update ROADMAP.md checkbox and
+ * progress table, update STATE.md counters. No git commit — handled by calling skill (TOOL-04).
+ */
+function cmdPhaseComplete(cwd, phaseNum) {
+  if (!phaseNum) error('Usage: phase complete <phase-number>');
+  const paths = requirePlanning(cwd);
+
+  const phaseDir = findPhaseDir(cwd, phaseNum);
+  if (!phaseDir) error('Phase directory not found for phase ' + phaseNum);
+
+  // Count PLAN.md and SUMMARY.md files
+  let planCount = 0;
+  let summaryCount = 0;
+  try {
+    const files = fs.readdirSync(phaseDir);
+    planCount = files.filter(f => f.endsWith('-PLAN.md')).length;
+    summaryCount = files.filter(f => f.endsWith('-SUMMARY.md')).length;
+  } catch {
+    error('Cannot read phase directory: ' + phaseDir);
+  }
+
+  // T-03-03: Explicit guard — refuse to mark complete if plans are unexecuted
+  if (summaryCount < planCount) {
+    error('Phase ' + phaseNum + ' has ' + (planCount - summaryCount) + ' unexecuted plans. Execute all plans before completing.');
+  }
+
+  const roadmapPath = paths.roadmap;
+  const statePath = paths.state;
+  const today = new Date().toISOString().split('T')[0];
+
+  // ─── Update ROADMAP.md ──────────────────────────────────────────────────────
+  if (!fs.existsSync(roadmapPath)) error('ROADMAP.md not found');
+  let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+
+  // Toggle checkbox from [ ] to [x] for this phase
+  const phaseEscaped = String(phaseNum).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  roadmapContent = roadmapContent.replace(
+    new RegExp(`(- \\[ \\] \\*\\*Phase ${phaseEscaped}[:\\s])`, 'm'),
+    (_m, g1) => g1.replace('- [ ]', '- [x]')
+  );
+
+  // Update progress table row: set status to "Complete" and add date
+  const tableRowPattern = new RegExp(
+    `^(\\|\\s*${phaseEscaped}\\.?\\s[^|]*(?:\\|[^\\n]*))$`,
+    'im'
+  );
+  roadmapContent = roadmapContent.replace(tableRowPattern, (fullRow) => {
+    const cells = fullRow.split('|').slice(1, -1);
+    if (cells.length === 5) {
+      cells[3] = ' Complete    ';
+      cells[4] = ' ' + today + ' ';
+    } else if (cells.length === 4) {
+      cells[2] = ' Complete    ';
+      cells[3] = ' ' + today + ' ';
+    }
+    return '|' + cells.join('|') + '|';
+  });
+
+  validateWritePath(roadmapPath, cwd);
+  atomicWriteFileSync(roadmapPath, roadmapContent);
+
+  // ─── Update STATE.md ────────────────────────────────────────────────────────
+  if (!fs.existsSync(statePath)) error('STATE.md not found');
+  let stateContent = fs.readFileSync(statePath, 'utf-8');
+  const fm = extractFrontmatter(stateContent);
+
+  // Increment completed_phases counter
+  if (!fm.progress) fm.progress = {};
+  const completedPhases = (parseInt(String(fm.progress.completed_phases || '0'), 10) || 0) + 1;
+  const totalPhases = parseInt(String(fm.progress.total_phases || '0'), 10) || 0;
+  fm.progress.completed_phases = completedPhases;
+  fm.progress.percent = totalPhases > 0 ? Math.round((completedPhases / totalPhases) * 100) : 0;
+  fm.last_updated = new Date().toISOString();
+  fm.last_activity = today + ' — Phase ' + phaseNum + ' completed';
+  const allPhasesDone = totalPhases > 0 && completedPhases >= totalPhases;
+  if (allPhasesDone) fm.status = 'complete';
+
+  // Replace frontmatter block
+  const fmMatch = stateContent.match(/^---[\s\S]+?---\r?\n/);
+  if (fmMatch) {
+    const body = stateContent.slice(fmMatch[0].length);
+    stateContent = reconstructFrontmatter(fm) + '\n---\n' + body;
+  }
+
+  validateWritePath(statePath, cwd);
+  atomicWriteFileSync(statePath, stateContent);
+
+  output({
+    phase: phaseNum,
+    completed: true,
+    all_phases_done: allPhasesDone,
+    progress: {
+      completed_phases: completedPhases,
+      total_phases: totalPhases,
+      percent: fm.progress.percent,
+    },
+  });
+}
+
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
 async function main() {
@@ -1446,7 +1621,7 @@ async function main() {
 
     // ─── Phase plan index ────────────────────────────────────────────────
     case 'phase-plan-index': {
-      error('Command not yet implemented: phase-plan-index (plan 01-03)');
+      cmdPhasePlanIndex(cwd, args[1], raw);
       return;
     }
 
@@ -1454,7 +1629,7 @@ async function main() {
     case 'phase': {
       const sub = args[1];
       if (sub === 'complete') {
-        error('Command not yet implemented: phase complete (plan 01-03)');
+        cmdPhaseComplete(cwd, args[2]);
       } else {
         error('Unknown phase subcommand: ' + sub);
       }
