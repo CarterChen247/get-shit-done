@@ -35,8 +35,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01: Build gxd-tools.cjs read commands (roadmap get-phase, state-snapshot, find-phase, config-get, progress bar, summary-extract, audit-uat)
 - [x] 01-02: Build gxd-tools.cjs write commands (state begin-phase, state planned-phase, roadmap update-plan-progress, roadmap analyze, config-set, agent-skills, init plan-phase, init execute-phase)
-- [ ] 01-03: Build gxd-tools.cjs execute commands (phase-plan-index, phase complete) and validate all 18 commands against test fixtures
-- [ ] 01-04: Build gxd:progress skill — read STATE.md + ROADMAP.md, implement 7-route routing table, validate read-only behavior
+- [x] 01-03: Build gxd-tools.cjs execute commands (phase-plan-index, phase complete) and validate all 18 commands against test fixtures
+- [x] 01-04: Build gxd:progress skill — read STATE.md + ROADMAP.md, implement 7-route routing table, validate read-only behavior
 
 ### Phase 2: Branch-PR
 **Goal**: Users can run `gxd:branch-pr` on a mixed-commit branch and get a clean `{branch}-pr` branch that contains only app code commits with no `.planning/` phase file history.
