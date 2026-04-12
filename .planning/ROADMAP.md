@@ -48,12 +48,11 @@ Plans:
   3. Phase-specific planning files (PLAN.md, SUMMARY.md, RESEARCH.md) are absent from the PR branch history
   4. Commits that touched both app code and planning files are preserved with planning dirs stripped from the index
   5. Skill requires no gxd-tools.cjs invocation — pure git commands only
-**Plans**: 3 plans
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: Implement pure-git branch creation and structural file preservation logic
-- [ ] 02-02: Implement mixed-commit cherry-pick with planning dir index stripping
-- [ ] 02-03: End-to-end test on a repo with mixed commits; validate PR branch contents
+- [ ] 02-01-PLAN.md — Build SKILL.md with cherry-pick logic and static validation tests
+- [ ] 02-02-PLAN.md — Integration test with git fixture repo and human verification
 
 ### Phase 3: Plan-Phase Pipeline
 **Goal**: Users can run `gxd:plan-phase <N>` and get a PLAN.md that has been researched, written, and checker-verified against the phase goal and all phase requirement IDs.
@@ -112,7 +111,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Helper Script + Progress | 1/4 | In Progress|  |
-| 2. Branch-PR | 0/3 | Not started | - |
+| 2. Branch-PR | 0/2 | Not started | - |
 | 3. Plan-Phase Pipeline | 0/4 | Not started | - |
 | 4. Execute-Phase Sequential | 0/3 | Not started | - |
 | 5. Execute-Phase Parallel | 0/3 | Not started | - |
