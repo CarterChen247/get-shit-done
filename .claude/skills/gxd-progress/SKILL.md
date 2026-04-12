@@ -16,7 +16,7 @@ Check project progress, summarize recent work and what is ahead, then intelligen
 Load all progress data via gxd-tools read commands.
 
 ```bash
-INIT=$(node ".claude/bin/gxd-tools.cjs" init progress)
+INIT=$(node ".claude/skills/gxd-progress/gxd-tools.cjs" init progress)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -57,10 +57,10 @@ Go to **Route F** (between milestones).
 Get structured data from gxd-tools read commands:
 
 ```bash
-ROADMAP=$(node ".claude/bin/gxd-tools.cjs" roadmap analyze)
+ROADMAP=$(node ".claude/skills/gxd-progress/gxd-tools.cjs" roadmap analyze)
 if [[ "$ROADMAP" == @file:* ]]; then ROADMAP=$(cat "${ROADMAP#@file:}"); fi
 
-STATE=$(node ".claude/bin/gxd-tools.cjs" state-snapshot)
+STATE=$(node ".claude/skills/gxd-progress/gxd-tools.cjs" state-snapshot)
 if [[ "$STATE" == @file:* ]]; then STATE=$(cat "${STATE#@file:}"); fi
 ```
 </step>
@@ -138,7 +138,7 @@ for p in d.get('phases',[]):
 RECENT_WORK=""
 if [ -n "$PHASE_DIR" ] && [ -d "$PHASE_DIR" ]; then
     for summary_file in $(ls -1t "$PHASE_DIR"/*-SUMMARY.md 2>/dev/null | head -3); do
-        ONE_LINER=$(node ".claude/bin/gxd-tools.cjs" summary-extract "$summary_file" --fields one_liner 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('one_liner',''))" 2>/dev/null || echo "")
+        ONE_LINER=$(node ".claude/skills/gxd-progress/gxd-tools.cjs" summary-extract "$summary_file" --fields one_liner 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('one_liner',''))" 2>/dev/null || echo "")
         PLAN_NUM=$(basename "$summary_file" | sed 's/[0-9]*-\([0-9]*\)-SUMMARY.md/\1/')
         if [ -n "$ONE_LINER" ]; then
             RECENT_WORK="${RECENT_WORK}\n- Phase ${CURRENT_PHASE}, Plan ${PLAN_NUM}: ${ONE_LINER}"
@@ -187,7 +187,7 @@ for b in blockers:
 Get the progress bar and present the formatted status report:
 
 ```bash
-PROGRESS_BAR=$(node ".claude/bin/gxd-tools.cjs" progress bar --raw 2>/dev/null || echo "[░░░░░░░░░░] 0%")
+PROGRESS_BAR=$(node ".claude/skills/gxd-progress/gxd-tools.cjs" progress bar --raw 2>/dev/null || echo "[░░░░░░░░░░] 0%")
 ```
 
 Present the report in this format:

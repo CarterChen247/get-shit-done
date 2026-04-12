@@ -6,7 +6,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-GXD_TOOLS="$SCRIPT_DIR/gxd-tools.cjs"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+GXD_TOOLS="$REPO_ROOT/.claude/skills/gxd-progress/gxd-tools.cjs"
 
 if [ ! -f "$GXD_TOOLS" ]; then
   echo "ERROR: gxd-tools.cjs not found at $GXD_TOOLS" >&2
