@@ -819,6 +819,493 @@ function cmdInitProgress(cwd, raw) {
   }, raw);
 }
 
+// ─── Write helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Atomic write: write to .tmp.PID then rename to final path.
+ * Process crash mid-write leaves tmp file, not corrupted target.
+ */
+function atomicWriteFileSync(filePath, content) {
+  const tmp = filePath + '.tmp.' + process.pid;
+  fs.writeFileSync(tmp, content, 'utf-8');
+  fs.renameSync(tmp, filePath);
+}
+
+/**
+ * Validate that a write target is inside .planning/ or .claude/.
+ * Rejects CLAUDE.md and settings.json by basename (T-02-01, T-02-04).
+ */
+function validateWritePath(filePath, cwd) {
+  const resolved = path.resolve(filePath);
+  const planning = path.resolve(planningDir(cwd));
+  const claude = path.resolve(path.join(cwd, '.claude'));
+  if (!resolved.startsWith(planning) && !resolved.startsWith(claude)) {
+    error('Write rejected: path ' + filePath + ' is outside .planning/ and .claude/');
+  }
+  const basename = path.basename(resolved);
+  if (basename === 'CLAUDE.md' || basename === 'settings.json') {
+    error('Write rejected: ' + basename + ' is a protected file');
+  }
+}
+
+// ─── Write command implementations ───────────────────────────────────────────
+
+/**
+ * state begin-phase --phase N --name S --plans C
+ * Update STATE.md frontmatter and body when starting a new phase.
+ */
+function cmdStateBeginPhase(cwd, args) {
+  const named = parseNamedArgs(args, ['phase', 'name', 'plans']);
+  const { phase, name, plans } = named;
+  if (!phase) error('--phase required for state begin-phase');
+
+  const paths = requirePlanning(cwd);
+  const statePath = paths.state;
+  if (!fs.existsSync(statePath)) error('STATE.md not found');
+
+  const today = new Date().toISOString().split('T')[0];
+  let content = fs.readFileSync(statePath, 'utf-8');
+
+  // Update frontmatter fields via regex replacements
+  const fm = extractFrontmatter(content);
+  fm.status = 'executing';
+  fm.stopped_at = 'Phase ' + phase + (name ? ' — ' + name : '');
+  fm.last_updated = new Date().toISOString();
+  fm.last_activity = today + ' — Phase ' + phase + ' started';
+  if (plans) {
+    if (!fm.progress) fm.progress = {};
+    fm.progress.total_plans = parseInt(plans, 10);
+  }
+
+  // Replace frontmatter block
+  const fmMatch = content.match(/^---[\s\S]+?---\r?\n/);
+  if (fmMatch) {
+    const body = content.slice(fmMatch[0].length);
+    content = reconstructFrontmatter(fm) + '\n---\n' + body;
+  }
+
+  // Update Current Position section body fields
+  const posPattern = /(##\s*Current Position\s*\n)([\s\S]*?)(?=\n##|$)/i;
+  content = content.replace(posPattern, (_match, header, body) => {
+    let b = body;
+    if (/^Phase:/m.test(b)) b = b.replace(/^Phase:.*$/m, 'Phase: ' + phase + ' of 5 (' + (name || '') + ')');
+    if (/^Status:/m.test(b)) b = b.replace(/^Status:.*$/m, 'Status: Executing');
+    if (/^Last activity:/im.test(b)) b = b.replace(/^Last activity:.*$/im, 'Last activity: ' + today + ' — Phase ' + phase + ' started');
+    return header + b;
+  });
+
+  validateWritePath(statePath, cwd);
+  atomicWriteFileSync(statePath, content);
+  output({ updated: true, phase, name, plans });
+}
+
+/**
+ * state planned-phase --phase N --plans C
+ * Update STATE.md after planning completes for a phase.
+ */
+function cmdStatePlannedPhase(cwd, args) {
+  const named = parseNamedArgs(args, ['phase', 'plans']);
+  const { phase, plans } = named;
+  if (!phase) error('--phase required for state planned-phase');
+
+  const paths = requirePlanning(cwd);
+  const statePath = paths.state;
+  if (!fs.existsSync(statePath)) error('STATE.md not found');
+
+  let content = fs.readFileSync(statePath, 'utf-8');
+  const fm = extractFrontmatter(content);
+  fm.status = 'planning';
+  fm.stopped_at = 'Phase ' + phase + ' planned';
+  fm.last_updated = new Date().toISOString();
+  if (plans) {
+    if (!fm.progress) fm.progress = {};
+    fm.progress.total_plans = parseInt(plans, 10);
+  }
+
+  const fmMatch = content.match(/^---[\s\S]+?---\r?\n/);
+  if (fmMatch) {
+    const body = content.slice(fmMatch[0].length);
+    content = reconstructFrontmatter(fm) + '\n---\n' + body;
+  }
+
+  validateWritePath(statePath, cwd);
+  atomicWriteFileSync(statePath, content);
+  output({ updated: true, phase, plans });
+}
+
+/**
+ * roadmap update-plan-progress <N>
+ * Count PLAN.md and SUMMARY.md files for phase N, update ROADMAP.md progress table row.
+ */
+function cmdRoadmapUpdatePlanProgress(cwd, phaseNum) {
+  if (!phaseNum) error('phase number required for roadmap update-plan-progress');
+  const paths = requirePlanning(cwd);
+  const roadmapPath = paths.roadmap;
+
+  const phaseDir = findPhaseDir(cwd, phaseNum);
+  if (!phaseDir) error('Phase ' + phaseNum + ' directory not found');
+
+  let planCount = 0;
+  let summaryCount = 0;
+  try {
+    const files = fs.readdirSync(phaseDir);
+    planCount = files.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length;
+    summaryCount = files.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
+  } catch {
+    error('Cannot read phase directory: ' + phaseDir);
+  }
+
+  if (!fs.existsSync(roadmapPath)) {
+    output({ updated: false, reason: 'ROADMAP.md not found', plan_count: planCount, summary_count: summaryCount });
+    return;
+  }
+
+  const isComplete = planCount > 0 && summaryCount >= planCount;
+  const status = isComplete ? 'Complete' : summaryCount > 0 ? 'In Progress' : 'Planned';
+  const today = new Date().toISOString().split('T')[0];
+  const dateField = isComplete ? ' ' + today + ' ' : '  ';
+
+  let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+  const phaseEscaped = phaseNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // Update progress table row (handles 4 or 5 column tables)
+  const tableRowPattern = new RegExp(
+    `^(\\|\\s*${phaseEscaped}\\.?\\s[^|]*(?:\\|[^\\n]*))$`,
+    'im'
+  );
+  roadmapContent = roadmapContent.replace(tableRowPattern, (fullRow) => {
+    const cells = fullRow.split('|').slice(1, -1);
+    if (cells.length === 5) {
+      cells[2] = ' ' + summaryCount + '/' + planCount + ' ';
+      cells[3] = ' ' + status.padEnd(11);
+      cells[4] = dateField;
+    } else if (cells.length === 4) {
+      cells[1] = ' ' + summaryCount + '/' + planCount + ' ';
+      cells[2] = ' ' + status.padEnd(11);
+      cells[3] = dateField;
+    }
+    return '|' + cells.join('|') + '|';
+  });
+
+  validateWritePath(roadmapPath, cwd);
+  atomicWriteFileSync(roadmapPath, roadmapContent);
+  output({ updated: true, phase: phaseNum, plan_count: planCount, summary_count: summaryCount, status });
+}
+
+/**
+ * roadmap analyze
+ * Full roadmap parse: all phases with disk status, goals, deps, plan/summary counts, aggregated stats.
+ */
+function cmdRoadmapAnalyze(cwd, raw) {
+  const paths = requirePlanning(cwd);
+  const roadmapPath = paths.roadmap;
+
+  if (!fs.existsSync(roadmapPath)) {
+    output({ error: 'ROADMAP.md not found', phases: [], stats: { total_phases: 0 } }, raw);
+    return;
+  }
+
+  const rawContent = fs.readFileSync(roadmapPath, 'utf-8');
+  const content = extractCurrentMilestone(rawContent);
+  const phasesDir = paths.phases;
+
+  // Build phase directory lookup
+  let phaseDirNames = [];
+  try {
+    phaseDirNames = fs.readdirSync(phasesDir, { withFileTypes: true })
+      .filter(e => e.isDirectory())
+      .map(e => e.name);
+  } catch { /* no phases dir */ }
+
+  // Extract all phase headings
+  const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
+  const phases = [];
+  let match;
+
+  while ((match = phasePattern.exec(content)) !== null) {
+    const phaseNum = match[1];
+    const phaseName = match[2].replace(/\(INSERTED\)/i, '').trim();
+
+    const sectionStart = match.index;
+    const restOfContent = content.slice(sectionStart);
+    const nextHeader = restOfContent.match(/\n#{2,4}\s+Phase\s+\d/i);
+    const sectionEnd = nextHeader ? sectionStart + nextHeader.index : content.length;
+    const section = content.slice(sectionStart, sectionEnd);
+
+    const goalMatch = section.match(/\*\*Goal(?::\*\*|\*\*:)\s*([^\n]+)/i);
+    const goal = goalMatch ? goalMatch[1].trim() : null;
+
+    const dependsMatch = section.match(/\*\*Depends on(?::\*\*|\*\*:)\s*([^\n]+)/i);
+    const depends_on = dependsMatch ? dependsMatch[1].trim() : null;
+
+    // Check disk status
+    const normalized = normalizePhaseName(phaseNum);
+    let diskStatus = 'no_directory';
+    let planCount = 0;
+    let summaryCount = 0;
+
+    const dirMatch = phaseDirNames.find(d => phaseTokenMatches(d, normalized));
+    if (dirMatch) {
+      try {
+        const phaseFiles = fs.readdirSync(path.join(phasesDir, dirMatch));
+        planCount = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length;
+        summaryCount = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
+
+        if (summaryCount >= planCount && planCount > 0) diskStatus = 'complete';
+        else if (summaryCount > 0) diskStatus = 'partial';
+        else if (planCount > 0) diskStatus = 'planned';
+        else diskStatus = 'empty';
+      } catch { /* skip */ }
+    }
+
+    // Check ROADMAP checkbox
+    const checkboxPattern = new RegExp(`-\\s*\\[(x| )\\]\\s*.*Phase\\s+${normalized.replace('.', '\\.')}[:\\s]`, 'i');
+    const checkboxMatch = content.match(checkboxPattern);
+    const roadmapComplete = checkboxMatch ? checkboxMatch[1] === 'x' : false;
+    if (roadmapComplete && diskStatus !== 'complete') diskStatus = 'complete';
+
+    phases.push({ number: phaseNum, name: phaseName, goal, depends_on, plan_count: planCount, summary_count: summaryCount, disk_status: diskStatus, roadmap_complete: roadmapComplete });
+  }
+
+  const totalPlans = phases.reduce((s, p) => s + p.plan_count, 0);
+  const totalSummaries = phases.reduce((s, p) => s + p.summary_count, 0);
+  const completedPhases = phases.filter(p => p.disk_status === 'complete').length;
+  const currentPhase = phases.find(p => p.disk_status === 'planned' || p.disk_status === 'partial') || null;
+  const nextPhase = phases.find(p => p.disk_status === 'empty' || p.disk_status === 'no_directory') || null;
+
+  output({
+    phases,
+    phase_count: phases.length,
+    completed_phases: completedPhases,
+    total_plans: totalPlans,
+    total_summaries: totalSummaries,
+    progress_percent: totalPlans > 0 ? Math.min(100, Math.round((totalSummaries / totalPlans) * 100)) : 0,
+    current_phase: currentPhase ? currentPhase.number : null,
+    next_phase: nextPhase ? nextPhase.number : null,
+    stats: {
+      total_phases: phases.length,
+      completed: completedPhases,
+      in_progress: phases.filter(p => p.disk_status === 'partial').length,
+      total_plans: totalPlans,
+      total_summaries: totalSummaries,
+      percent: totalPlans > 0 ? Math.min(100, Math.round((totalSummaries / totalPlans) * 100)) : 0,
+    },
+  }, raw);
+}
+
+/**
+ * config-set <key> <value>
+ * Write a config key to .planning/config.json (validated against allowlist, T-02-02).
+ */
+const VALID_CONFIG_KEYS = ['commit_docs', 'workflow.research', 'workflow.discuss_mode', 'workflow.nyquist_validation', 'workflow.security_enforcement', 'workflow.auto_advance', 'workflow.verifier', 'model_profile'];
+
+function cmdConfigSet(cwd, key, value) {
+  if (!key) error('Usage: config-set <key> <value>');
+  if (!VALID_CONFIG_KEYS.includes(key)) {
+    error('Invalid config key: ' + key + '. Valid keys: ' + VALID_CONFIG_KEYS.join(', '));
+  }
+
+  requirePlanning(cwd);
+  const configPath = planningPaths(cwd).config;
+
+  // Load existing config
+  let config = {};
+  try {
+    config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  } catch { /* start fresh */ }
+
+  // Parse value type
+  let parsedValue;
+  if (value === 'true') parsedValue = true;
+  else if (value === 'false') parsedValue = false;
+  else if (!isNaN(Number(value)) && value !== '') parsedValue = Number(value);
+  else parsedValue = value;
+
+  // Set dot-path key
+  const keys = key.split('.');
+  let obj = config;
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (typeof obj[keys[i]] !== 'object' || obj[keys[i]] === null) {
+      obj[keys[i]] = {};
+    }
+    obj = obj[keys[i]];
+  }
+  obj[keys[keys.length - 1]] = parsedValue;
+
+  validateWritePath(configPath, cwd);
+  atomicWriteFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+  output({ key, value: parsedValue, updated: true });
+}
+
+/**
+ * agent-skills <agent-type>
+ * Return the skills file list and existence status for a given agent type.
+ */
+function cmdAgentSkills(cwd, agentType) {
+  if (!agentType) error('Usage: agent-skills <agent-type>');
+
+  const agentMap = {
+    planner: ['.claude/agents/gxd-planner.md'],
+    researcher: ['.claude/agents/gxd-researcher.md'],
+    checker: ['.claude/agents/gxd-checker.md'],
+    executor: ['.claude/agents/gxd-executor.md'],
+    verifier: ['.claude/agents/gxd-verifier.md'],
+  };
+
+  const skillPaths = agentMap[agentType] || ['.claude/agents/gxd-' + agentType + '.md'];
+  const skills = skillPaths.map(p => ({
+    path: p,
+    exists: fs.existsSync(path.join(cwd, p)),
+  }));
+
+  output({ agent_type: agentType, skills, all_present: skills.every(s => s.exists) });
+}
+
+/**
+ * init plan-phase <N>
+ * Return JSON context bundle for the plan-phase workflow.
+ */
+function cmdInitPlanPhase(cwd, phaseNum, raw) {
+  if (!phaseNum) error('phase number required for init plan-phase');
+  requirePlanning(cwd);
+
+  const config = loadConfig(cwd);
+  const phaseDir = findPhaseDir(cwd, phaseNum);
+
+  // Read ROADMAP phase section
+  let roadmapSection = null;
+  try {
+    const roadmapContent = fs.readFileSync(planningPaths(cwd).roadmap, 'utf-8');
+    const milestoneContent = extractCurrentMilestone(roadmapContent);
+    roadmapSection = searchPhaseInContent(milestoneContent, phaseNum);
+  } catch { /* no roadmap */ }
+
+  // Read STATE.md snapshot
+  let stateSnapshot = null;
+  try {
+    stateSnapshot = fs.readFileSync(planningPaths(cwd).state, 'utf-8');
+  } catch { /* no state */ }
+
+  let hasResearch = false;
+  let hasContext = false;
+  let researchContent = null;
+  let contextContent = null;
+  let phaseSlug = null;
+  let phaseName = null;
+
+  if (phaseDir) {
+    try {
+      const files = fs.readdirSync(phaseDir);
+      const researchFile = files.find(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md');
+      const contextFile = files.find(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md');
+
+      if (researchFile) {
+        hasResearch = true;
+        researchContent = fs.readFileSync(path.join(phaseDir, researchFile), 'utf-8');
+      }
+      if (contextFile) {
+        hasContext = true;
+        contextContent = fs.readFileSync(path.join(phaseDir, contextFile), 'utf-8');
+      }
+    } catch { /* skip */ }
+
+    // Derive phase slug and name from dir name: "01-helper-script-progress"
+    const dirName = path.basename(phaseDir);
+    const parts = dirName.match(/^\d+[A-Z]?(?:\.\d+)*-(.*)/);
+    if (parts) phaseSlug = parts[1];
+    if (roadmapSection) {
+      const nameMatch = roadmapSection.match(/^###\s+Phase\s+\d+[^:]*:\s*([^\n]+)/i);
+      if (nameMatch) phaseName = nameMatch[1].trim();
+    }
+  }
+
+  const result = {
+    phase_dir: phaseDir ? toPosixPath(path.relative(cwd, phaseDir)) : null,
+    phase_number: phaseNum,
+    phase_slug: phaseSlug,
+    phase_name: phaseName,
+    has_research: hasResearch,
+    has_context: hasContext,
+    commit_docs: config.commit_docs,
+    research_content: researchContent,
+    context_content: contextContent,
+    roadmap_section: roadmapSection,
+    state_snapshot: stateSnapshot,
+    config_path: toPosixPath(path.relative(cwd, planningPaths(cwd).config)),
+    project_root: cwd,
+  };
+
+  output(result, raw);
+}
+
+/**
+ * init execute-phase <N>
+ * Return JSON context bundle for the execute-phase workflow.
+ */
+function cmdInitExecutePhase(cwd, phaseNum, raw) {
+  if (!phaseNum) error('phase number required for init execute-phase');
+  requirePlanning(cwd);
+
+  const config = loadConfig(cwd);
+  const phaseDir = findPhaseDir(cwd, phaseNum);
+  const paths = planningPaths(cwd);
+
+  let plans = [];
+  let summaries = [];
+  let incompletePlans = [];
+  let phaseSlug = null;
+  let phaseName = null;
+
+  if (phaseDir) {
+    try {
+      const files = fs.readdirSync(phaseDir);
+      plans = files.filter(f => f.match(/-PLAN\.md$/i)).sort();
+      summaries = files.filter(f => f.match(/-SUMMARY\.md$/i)).sort();
+      incompletePlans = plans.filter(p => {
+        const summaryName = p.replace('-PLAN.md', '-SUMMARY.md');
+        return !summaries.includes(summaryName);
+      });
+    } catch { /* skip */ }
+
+    const dirName = path.basename(phaseDir);
+    const parts = dirName.match(/^\d+[A-Z]?(?:\.\d+)*-(.*)/);
+    if (parts) phaseSlug = parts[1];
+  }
+
+  // Get phase name from ROADMAP
+  try {
+    const roadmapContent = fs.readFileSync(paths.roadmap, 'utf-8');
+    const milestoneContent = extractCurrentMilestone(roadmapContent);
+    const section = searchPhaseInContent(milestoneContent, phaseNum);
+    if (section) {
+      const nameMatch = section.match(/^###\s+Phase\s+\d+[^:]*:\s*([^\n]+)/i);
+      if (nameMatch) phaseName = nameMatch[1].trim();
+    }
+  } catch { /* no roadmap */ }
+
+  const result = {
+    phase_dir: phaseDir ? toPosixPath(path.relative(cwd, phaseDir)) : null,
+    phase_number: phaseNum,
+    phase_slug: phaseSlug,
+    phase_name: phaseName,
+    plans,
+    summaries,
+    incomplete_plans: incompletePlans,
+    plan_count: plans.length,
+    incomplete_count: incompletePlans.length,
+    commit_docs: config.commit_docs,
+    state_exists: fs.existsSync(paths.state),
+    roadmap_exists: fs.existsSync(paths.roadmap),
+    config_exists: fs.existsSync(paths.config),
+    state_path: toPosixPath(path.relative(cwd, paths.state)),
+    roadmap_path: toPosixPath(path.relative(cwd, paths.roadmap)),
+    config_path: toPosixPath(path.relative(cwd, paths.config)),
+    project_root: cwd,
+  };
+
+  output(result, raw);
+}
+
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
 async function main() {
@@ -873,9 +1360,9 @@ async function main() {
       if (sub === 'get-phase') {
         cmdRoadmapGetPhase(cwd, args[2], raw);
       } else if (sub === 'analyze') {
-        error('Command not yet implemented: roadmap analyze (plan 01-02)');
+        cmdRoadmapAnalyze(cwd, raw);
       } else if (sub === 'update-plan-progress') {
-        error('Command not yet implemented: roadmap update-plan-progress (plan 01-02)');
+        cmdRoadmapUpdatePlanProgress(cwd, args[2]);
       } else {
         error('Unknown roadmap subcommand: ' + sub);
       }
@@ -890,9 +1377,9 @@ async function main() {
     case 'state': {
       const sub = args[1];
       if (sub === 'begin-phase') {
-        error('Command not yet implemented: state begin-phase (plan 01-02)');
+        cmdStateBeginPhase(cwd, args.slice(2));
       } else if (sub === 'planned-phase') {
-        error('Command not yet implemented: state planned-phase (plan 01-02)');
+        cmdStatePlannedPhase(cwd, args.slice(2));
       } else {
         error('Unknown state subcommand: ' + sub);
       }
@@ -911,7 +1398,7 @@ async function main() {
       return;
     }
     case 'config-set': {
-      error('Command not yet implemented: config-set (plan 01-02)');
+      cmdConfigSet(cwd, args[1], args[2]);
       return;
     }
 
@@ -942,9 +1429,9 @@ async function main() {
       if (sub === 'progress') {
         cmdInitProgress(cwd, raw);
       } else if (sub === 'plan-phase') {
-        error('Command not yet implemented: init plan-phase (plan 01-02)');
+        cmdInitPlanPhase(cwd, args[2], raw);
       } else if (sub === 'execute-phase') {
-        error('Command not yet implemented: init execute-phase (plan 01-02)');
+        cmdInitExecutePhase(cwd, args[2], raw);
       } else {
         error('Unknown init subcommand: ' + sub);
       }
@@ -953,7 +1440,7 @@ async function main() {
 
     // ─── Agent skills ────────────────────────────────────────────────────
     case 'agent-skills': {
-      error('Command not yet implemented: agent-skills (plan 01-02)');
+      cmdAgentSkills(cwd, args[1]);
       return;
     }
 
