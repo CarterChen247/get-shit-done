@@ -1,3 +1,11 @@
+---
+name: gxd-progress
+description: Check project phase progress and route to next action. Use when asking about project status, what to do next, or current phase state.
+user-invocable: true
+disable-model-invocation: true
+allowed-tools: Bash Read
+---
+
 <purpose>
 Check project progress, summarize recent work and what is ahead, then intelligently route to the next action. Provides situational awareness before continuing work. This skill is READ-ONLY — it makes zero file writes.
 </purpose>
