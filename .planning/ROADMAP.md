@@ -52,7 +52,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — Build SKILL.md with cherry-pick logic and static validation tests
-- [ ] 02-02-PLAN.md — Integration test with git fixture repo and human verification
+- [x] 02-02-PLAN.md — Integration test with git fixture repo and human verification
 
 ### Phase 3: Plan-Phase Pipeline
 **Goal**: Users can run `gxd:plan-phase <N>` and get a PLAN.md that has been researched, written, and checker-verified against the phase goal and all phase requirement IDs.
