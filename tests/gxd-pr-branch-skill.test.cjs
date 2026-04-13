@@ -3,7 +3,7 @@
 /**
  * Static validation tests for gxd:branch-pr SKILL.md
  *
- * Validates that the SKILL.md at .claude/skills/gxd-branch-pr/SKILL.md
+ * Validates that the SKILL.md at .claude/skills/gxd-pr-branch/SKILL.md
  * satisfies all four phase requirements (PR-01 through PR-04) and
  * key locked decisions (D-11, D-12, D-14, D-15).
  *
@@ -16,9 +16,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const skillPath = path.resolve(__dirname, '..', '.claude', 'skills', 'gxd-branch-pr', 'SKILL.md');
+const skillPath = path.resolve(__dirname, '..', '.claude', 'skills', 'gxd-pr-branch', 'SKILL.md');
 
-describe('gxd-branch-pr SKILL.md validation', () => {
+describe('gxd-pr-branch SKILL.md validation', () => {
   let content;
 
   function getContent() {
@@ -35,11 +35,11 @@ describe('gxd-branch-pr SKILL.md validation', () => {
     content = c;
   });
 
-  test('frontmatter: contains name: gxd-branch-pr', () => {
+  test('frontmatter: contains name: gxd-pr-branch', () => {
     const c = getContent();
     assert.ok(
-      c.includes('name: gxd-branch-pr'),
-      'SKILL.md frontmatter must contain "name: gxd-branch-pr"'
+      c.includes('name: gxd-pr-branch'),
+      'SKILL.md frontmatter must contain "name: gxd-pr-branch"'
     );
   });
 

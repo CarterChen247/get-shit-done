@@ -13,8 +13,8 @@ Copy these files from this repo into your target project:
   gxd-execute-phase/
     SKILL.md                          # /gxd-execute-phase (Phase 4-5)
     gxd-tools.cjs
-  gxd-branch-pr/
-    SKILL.md                          # /gxd-branch-pr (Phase 2, no gxd-tools)
+  gxd-pr-branch/
+    SKILL.md                          # /gxd-pr-branch (Phase 2, no gxd-tools)
 .claude/agents/
   gxd-researcher.md                   # phase researcher (Phase 3)
   gxd-planner.md                      # plan writer (Phase 3)

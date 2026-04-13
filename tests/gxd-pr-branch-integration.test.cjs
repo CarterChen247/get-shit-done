@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Integration tests for gxd:branch-pr SKILL.md
+ * Integration tests for gxd:pr-branch SKILL.md
  *
  * Creates a temporary git repo with a mix of commit types (code-only,
  * structural-only, transient-only, mixed, code-only) and runs the exact

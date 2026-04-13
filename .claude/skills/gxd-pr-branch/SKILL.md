@@ -1,5 +1,5 @@
 ---
-name: gxd-branch-pr
+name: gxd-pr-branch
 description: Create a clean {branch}-pr branch with no .planning/ phase files — ready for code review
 argument-hint: "[target branch, default: main]"
 user-invocable: true
