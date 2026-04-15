@@ -12,11 +12,10 @@ Drop four skill files into any repo and get plan → execute → verify → PR w
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] `gxd:plan-phase` — Research phase, generate PLAN.md with task breakdown — Validated in Phase 3: Plan-Phase Pipeline
 
 ### Active
 
-- [ ] `gxd:plan-phase` — Research phase, generate PLAN.md with task breakdown
 - [ ] `gxd:execute-phase` — Execute plans with atomic commits and wave-based parallelization
 - [ ] `gxd:progress` — Check active phase status, show what's done and what's next
 - [ ] `gxd:branch-pr` — Create clean PR branch filtering out `.planning/` commits
@@ -70,4 +69,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-12 after initialization*
+*Last updated: 2026-04-15 after Phase 3 completion — plan-phase pipeline agents and orchestrator skill built*
