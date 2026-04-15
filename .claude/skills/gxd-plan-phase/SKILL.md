@@ -46,7 +46,7 @@ Check all 3 required agents exist BEFORE doing any work. Emit a loud error and s
 check_agent() {
   local TYPE="$1"
   local RESULT
-  RESULT=$(node ".claude/bin/gxd-tools.cjs" agent-skills "$TYPE" 2>/dev/null)
+  RESULT=$(node ".claude/skills/gxd-plan-phase/gxd-tools.cjs" agent-skills "$TYPE" 2>/dev/null)
   echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('all_present','false'))" 2>/dev/null || echo "false"
 }
 
@@ -74,7 +74,7 @@ If ANY agent is missing: display the error and STOP. Do not proceed to init or r
 Initialize the phase context using gxd-tools:
 
 ```bash
-INIT=$(node ".claude/bin/gxd-tools.cjs" init plan-phase "$PHASE_NUM")
+INIT=$(node ".claude/skills/gxd-plan-phase/gxd-tools.cjs" init plan-phase "$PHASE_NUM")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 
 PHASE_DIR=$(echo "$INIT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('phase_dir') or '')" 2>/dev/null || echo "")
@@ -98,7 +98,7 @@ fi
 Extract requirement IDs for this phase from ROADMAP.md:
 
 ```bash
-PHASE_SECTION=$(node ".claude/bin/gxd-tools.cjs" roadmap get-phase "$PHASE_NUM" 2>/dev/null || echo "")
+PHASE_SECTION=$(node ".claude/skills/gxd-plan-phase/gxd-tools.cjs" roadmap get-phase "$PHASE_NUM" 2>/dev/null || echo "")
 REQ_IDS=$(echo "$PHASE_SECTION" | grep "^\*\*Requirements\*\*\|^\*\*Requirements:\*\*" | sed 's/\*\*Requirements:\*\*//;s/\*\*Requirements\*\*://;s/\[//g;s/\]//g;s/^[[:space:]]*//')
 ```
 
@@ -345,7 +345,7 @@ Next: Run gxd:execute-phase {PHASE_NUM} to execute.
 - [ ] RESEARCH.md exists in phase directory (either pre-existing or newly created)
 - [ ] At least one PLAN.md exists in phase directory
 - [ ] Checker returned VERIFICATION PASSED (or user approved despite issues)
-- [ ] No absolute paths in any command (all use relative `.claude/bin/gxd-tools.cjs`)
+- [ ] All gxd-tools references use the local copy in this skill folder
 - [ ] Agent-missing guard fired before any work was attempted
 - [ ] Revision loop bounded to max 3 iterations with stall detection
 - [ ] User escalated via AskUserQuestion on stall or iteration cap
