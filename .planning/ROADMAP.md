@@ -67,10 +67,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 03-01: Build gxd-researcher.md agent — produces RESEARCH.md for a given phase
-- [ ] 03-02: Build gxd-planner.md agent — produces PLAN.md, returns PLANNING COMPLETE or REVISIONS NEEDED
-- [ ] 03-03: Build gxd-checker.md agent — verifies plan quality and requirement coverage, returns structured assessment
-- [ ] 03-04: Build gxd:plan-phase orchestrator skill — agent-missing guard, researcher → planner → checker loop with 3-iteration stall detection, requirements coverage gate
+- [x] 03-01: Build gxd-researcher.md agent — produces RESEARCH.md for a given phase
+- [x] 03-02: Build gxd-planner.md agent — produces PLAN.md, returns PLANNING COMPLETE or REVISIONS NEEDED
+- [x] 03-03: Build gxd-checker.md agent — verifies plan quality and requirement coverage, returns structured assessment
+- [x] 03-04: Build gxd:plan-phase orchestrator skill — agent-missing guard, researcher → planner → checker loop with 3-iteration stall detection, requirements coverage gate
 
 ### Phase 4: Execute-Phase Sequential
 **Goal**: Users can run `gxd:execute-phase <N>` in sequential mode and have each plan executed with atomic commits, followed by a verifier-produced VERIFICATION.md and phase completion recorded in STATE.md and ROADMAP.md.
