@@ -39,35 +39,45 @@ PADDED_PHASE=$(printf "%02d" "$PHASE_NUM")
 ```
 </step>
 
-<step name="check_agents">
-Check all 3 required agents exist BEFORE doing any work. Emit a loud error and stop if any are missing.
+<step name="install_agents">
+Install bundled agent definitions to `.claude/agents/` if not already present. This makes the skill folder self-contained — copying `gxd-plan-phase/` is all that's needed.
 
 ```bash
-check_agent() {
-  local TYPE="$1"
-  local RESULT
-  RESULT=$(node ".claude/skills/gxd-plan-phase/gxd-tools.cjs" agent-skills "$TYPE" 2>/dev/null)
-  echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('all_present','false'))" 2>/dev/null || echo "false"
-}
+SKILL_DIR=".claude/skills/gxd-plan-phase"
+AGENTS_DIR=".claude/agents"
+mkdir -p "$AGENTS_DIR"
 
-RESEARCHER_OK=$(check_agent researcher)
-PLANNER_OK=$(check_agent planner)
-CHECKER_OK=$(check_agent checker)
+for AGENT in gxd-researcher gxd-planner gxd-checker; do
+  SRC="$SKILL_DIR/${AGENT}.md"
+  DST="$AGENTS_DIR/${AGENT}.md"
+  if [ -f "$SRC" ] && [ ! -f "$DST" ]; then
+    cp "$SRC" "$DST"
+    echo "Installed agent: $DST"
+  fi
+done
+```
 
-if [ "$RESEARCHER_OK" != "True" ] || [ "$PLANNER_OK" != "True" ] || [ "$CHECKER_OK" != "True" ]; then
+Then verify all 3 agents are in place:
+
+```bash
+MISSING=""
+for AGENT in gxd-researcher gxd-planner gxd-checker; do
+  if [ ! -f "$AGENTS_DIR/${AGENT}.md" ]; then
+    MISSING="$MISSING  - ${AGENT}.md\n"
+  fi
+done
+
+if [ -n "$MISSING" ]; then
   echo "ERROR: Required agents missing from .claude/agents/:"
-  [ "$RESEARCHER_OK" != "True" ] && echo "  - gxd-researcher.md"
-  [ "$PLANNER_OK" != "True" ]   && echo "  - gxd-planner.md"
-  [ "$CHECKER_OK" != "True" ]   && echo "  - gxd-checker.md"
-  echo ""
-  echo "Add the missing agent files and re-run gxd:plan-phase."
+  echo -e "$MISSING"
+  echo "Expected source files in $SKILL_DIR/ — check your installation."
   exit 1
 fi
 
 echo "All required agents present. Proceeding."
 ```
 
-If ANY agent is missing: display the error and STOP. Do not proceed to init or research.
+If ANY agent is missing after install attempt: display the error and STOP.
 </step>
 
 <step name="init_phase">
