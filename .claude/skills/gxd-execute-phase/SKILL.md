@@ -265,6 +265,14 @@ Use normal git commits (with hooks). Do NOT use --no-verify.
 )
 ```
 
+After the continuation executor returns, check its return value using the same logic as the initial executor:
+
+**If return value contains `## PLAN COMPLETE`:** Plan succeeded. Continue.
+
+**If return value contains `## CHECKPOINT REACHED`:** Another checkpoint was hit. Re-present the checkpoint details to the user and spawn another continuation executor (repeat from the AskUserQuestion step above).
+
+**If return value is unexpected:** Warn the user and ask how to proceed before continuing.
+
 If user selects (b): STOP. Display:
 "Execution paused. Resolve the checkpoint and re-run gxd:execute-phase {PHASE_NUM} to continue."
 
