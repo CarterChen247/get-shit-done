@@ -87,7 +87,12 @@ If ANY agent is missing after install attempt: display the error and STOP.
 Initialize the phase context using gxd-tools:
 
 ```bash
-INIT=$(node ".claude/skills/gxd-execute-phase/gxd-tools.cjs" init execute-phase "$PHASE_NUM")
+INIT=$(node ".claude/skills/gxd-execute-phase/gxd-tools.cjs" init execute-phase "$PHASE_NUM" 2>&1)
+INIT_EXIT=$?
+if [ $INIT_EXIT -ne 0 ]; then
+  echo "ERROR: gxd-tools init failed (exit $INIT_EXIT): $INIT"
+  exit 1
+fi
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 
 PHASE_DIR=$(echo "$INIT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('phase_dir') or '')" 2>/dev/null || echo "")
