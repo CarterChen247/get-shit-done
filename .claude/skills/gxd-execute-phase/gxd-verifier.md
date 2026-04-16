@@ -55,7 +55,7 @@ Set `is_re_verification = false`, proceed with Step 1.
 ```bash
 ls "$PHASE_DIR"/*-PLAN.md 2>/dev/null
 ls "$PHASE_DIR"/*-SUMMARY.md 2>/dev/null
-node ".claude/bin/gxd-tools.cjs" roadmap get-phase "$PHASE_NUM"
+node ".claude/skills/gxd-execute-phase/gxd-tools.cjs" roadmap get-phase "$PHASE_NUM"
 grep -E "^| $PHASE_NUM" .planning/REQUIREMENTS.md 2>/dev/null
 ```
 
@@ -68,7 +68,7 @@ In re-verification mode, must-haves come from Step 0.
 **Step 2a: Load ROADMAP success criteria (NON-NEGOTIABLE)**
 
 ```bash
-PHASE_DATA=$(node ".claude/bin/gxd-tools.cjs" roadmap get-phase "$PHASE_NUM" --raw)
+PHASE_DATA=$(node ".claude/skills/gxd-execute-phase/gxd-tools.cjs" roadmap get-phase "$PHASE_NUM" --raw)
 ```
 
 Parse `success_criteria` array → `roadmap_truths`. These are the contract. PLAN must-haves can ADD scope but never subtract.
