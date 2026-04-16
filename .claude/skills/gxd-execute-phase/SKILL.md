@@ -340,7 +340,7 @@ if [ ! -f "$VERIFICATION_FILE" ]; then
   exit 1
 fi
 
-STATUS=$(head -20 "$VERIFICATION_FILE" | grep "^status:" | sed 's/status:[[:space:]]*//')
+STATUS=$(grep "^status:" "$VERIFICATION_FILE" | head -1 | sed 's/status:[[:space:]]*//')
 echo "Verification status: $STATUS"
 ```
 
